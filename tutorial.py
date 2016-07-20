@@ -13,16 +13,14 @@ def group_signup_by_ident(watt, signupid, identifier):
     for group in watt.group_details(signupid=signupid):
         ident, description, capacity, post_data, signed_up = group
 
-        if not post_data:
-            continue
-
         if ident == identifier:
             if signed_up:
-                # TODO still sends sign up for courses where group leaving is disabled
+                # TODO detect signed-up if the leave group button isn't there
                 logging.info("Already signed up for group for group id {}".format(signupid))
                 return True
 
-            watt.group_send_signup(signupid, post_data)
+            if post_data:
+                watt.group_send_signup(signupid, post_data)
 
     return False
 
@@ -31,16 +29,14 @@ def group_fuzzy_signup(watt, signupid, name):
     for group in watt.group_details(signupid=signupid):
         ident, description, capacity, post_data, signed_up = group
 
-        if not post_data:
-            continue
-
         desc_match = [re.search(name, ident) for ident in description]
         if re.search(name, ident) or any(desc_match):
             if signed_up:
                 logging.info("Already signed up for group for group id {}".format(signupid))
                 return True
 
-            watt.group_send_signup(signupid, post_data)
+            if post_data:
+                watt.group_send_signup(signupid, post_data)
 
     return False
 
