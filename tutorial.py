@@ -1,10 +1,8 @@
 import re
 import logging
+import argparse
 import wattle
 import keyring
-
-logging.basicConfig(level=logging.INFO)
-
 
 # TODO python-dateutil has fuzzy date parsing for tutorial times
 # TODO use fuzzywuzzy for fuzzy string matching of tutorial names
@@ -14,6 +12,9 @@ logging.basicConfig(level=logging.INFO)
 def group_signup_by_ident(watt, signupid, identifier):
     for group in watt.group_details(signupid=signupid):
         ident, description, capacity, post_data, signed_up = group
+
+        if not post_data:
+            continue
 
         if ident == identifier:
             if signed_up:
@@ -30,10 +31,12 @@ def group_fuzzy_signup(watt, signupid, name):
     for group in watt.group_details(signupid=signupid):
         ident, description, capacity, post_data, signed_up = group
 
+        if not post_data:
+            continue
+
         desc_match = [re.search(name, ident) for ident in description]
         if re.search(name, ident) or any(desc_match):
             if signed_up:
-                # TODO still sends sign up for courses where group leaving is disabled
                 logging.info("Already signed up for group for group id {}".format(signupid))
                 return True
 
@@ -60,16 +63,19 @@ def auto_fuzzy_signup(watt, courseid, ident):
         if group_fuzzy_signup(watt, signupid, ident):
             break
 
+logging.basicConfig(level=logging.INFO)
 
-from pprint import pprint
+parser = argparse.ArgumentParser(description='Automatically signs up to groups on Wattle')
+parser.add_argument('--groupid', type=int, help='Specify the group ID to sign up for')
+parser.add_argument('--id', help='The tutorial slot to sign up for (the string identifier from the group select page')
+parser.add_argument('--username', help='Wattle username to log in with', required=True)
 
-w = wattle.Wattle("u5451339", keyring.get_password('anu', 'u5451339'))
-#pprint(w.courses())
-#pprint(w.course_echo_session(14319))
-#w.auto_signup(938775, '3. World Solar Car Competition (ANU)')
-#w.auto_signup(938775, '3. World Solar Car Competition (ANU)')
+args = parser.parse_args()
 
-#pprint(list(w.course_signups(17894)))
+w = wattle.Wattle(args.username, keyring.get_password('anu', args.username))
+
+if args.id and args.groupid:
+    auto_signup(w, args.groupid, args.id)
 
 #auto_fuzz_signup(17641, "Tutorial (?:Group )?0?5")
 
