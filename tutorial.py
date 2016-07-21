@@ -6,7 +6,7 @@ import keyring
 
 # TODO python-dateutil has fuzzy date parsing for tutorial times
 # TODO use fuzzywuzzy for fuzzy string matching of tutorial names
-# TODO scheduling
+# TODO scheduling using sched
 
 
 def group_signup_by_ident(watt, signupid, identifier):
@@ -14,6 +14,7 @@ def group_signup_by_ident(watt, signupid, identifier):
         ident, description, capacity, post_data, signed_up = group
 
         if ident == identifier:
+            logging.info("Found tutorial slot with ident {} and capacity {}".format(ident, capacity))
             if signed_up:
                 # TODO detect signed-up if the leave group button isn't there
                 logging.info("Already signed up for group for group id {}".format(signupid))
@@ -21,6 +22,8 @@ def group_signup_by_ident(watt, signupid, identifier):
 
             if post_data:
                 watt.group_send_signup(signupid, post_data)
+            else:
+                logging.info("No sign up button for {}".format(ident))
 
     return False
 
