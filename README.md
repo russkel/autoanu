@@ -1,11 +1,13 @@
 A series of tools for automating various tasks at ANU. Please **please** **please** **please** keep these to yourself.
 
 ### Install
+These tools require Python 3.5 or newer.
 
 ```
 pip install requests
 pip install lxml
 pip install keyring
+pip install prompt-toolkit
 ```
 
 Set your Wattle password for your uXXXXXX username into the keyring:
@@ -26,3 +28,13 @@ The `groupid` argument is the numerical id of the group/tutorial sign-up page. T
 The `id` argument is the tutorial slot that the script will attempt to join. This is the string found in the tutorial sign up table, in the left most column of the row of the slot you wish to join.
 
 At this point the script has no scheduling, so it will start to hammer wattle as soon as the command is run. Ideally you would start the script 5 seconds before the tutorial sign up opens to avoid any throttling or banning.
+
+### Booking Library Rooms
+
+This is an automated room booking script, the idea being that you use OS X's Automator and Scheduler to automatically book rooms, email participants the details and calendar invite.
+
+```
+pip install intervaltree
+pip install tabulate
+pip install dateutil
+```
