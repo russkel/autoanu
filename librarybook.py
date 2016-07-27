@@ -73,6 +73,16 @@ if __name__ == "__main__":
     import tabulate
     import keyring
     import dateutil.parser
+    import math
+
+    def draw(itree, start=8, end=23):
+        output = ""
+        for hr in range(math.floor(start), math.floor(end)):
+            for minute in [0, .25, .5, .75]:
+                output += "O" if itree[hr+minute] else "X"
+            output += "|"
+
+        return output
 
     parser = argparse.ArgumentParser(description='Books library rooms at the ANU libraries')
     parser.add_argument('--libraries', action='store_true', help='List libraries available')
@@ -115,10 +125,7 @@ if __name__ == "__main__":
                 date = date.date()
 
             for room, itree in lb.room_times(args.library, date):
-                print(room, itree)
-
-        # list free rooms on date time
+                print(room)
+                print(draw(itree))
 
     # TODO list own bookings
-
-    from pprint import pprint
