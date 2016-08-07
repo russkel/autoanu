@@ -40,6 +40,6 @@ pip install dateutil
 ```
 
 To list bookings at Chifley on a certain date:
-```python --username uXXXXXX --rooms -L Chifley -D "2016-07-27"```
+```python librarybook.py --username uXXXXXX --rooms -L Chifley -D "2016-07-27"```
 
 Booking rooms is TODO.

@@ -4,6 +4,8 @@ import datetime
 import intervaltree
 import requests
 import lxml.html
+import lxml.html.clean
+import dateutil.parser
 
 SITE = "https://library-admin.anu.edu.au/book-a-library-group-study-room/"
 ACTION = SITE + "index.html"
@@ -19,9 +21,22 @@ def time_to_interval(start, end):
     return start.hour + (start.minute/60), end.hour + (end.minute/60)
 
 
+def parse_booking_dt(raw_dt):
+    # parses datetimes in this format: Wednesday, 27 July 2016: 23:00 - 23:15
+    raw_dt = raw_dt.split(':', 1)
+    d = dateutil.parser.parse(raw_dt[0])
+
+    start, finish = [dateutil.parser.parse(r) for r in raw_dt[1].split('-')]
+    duration = finish - start
+    dt = datetime.datetime.combine(d, start.time())
+
+    return dt, duration
+
+
 class LibraryBooking:
     def __init__(self, username, password):
         self.sess = requests.session()
+        self.cleaner = lxml.html.clean.Cleaner(forms=False)
 
         logging.info("Logging into Library Booking Page with {}".format(username))
         self.homepage = self.sess.post(ACTION, {'inp_uid': username, 'inp_passwd': password})
@@ -42,6 +57,7 @@ class LibraryBooking:
                 for lib in tree.xpath("//select[@name='building']/option") if lib.attrib['value']]
 
     def room_times(self, library, date):
+        logging.info("Requesting booking times for {} on {}".format(library, date.isoformat()))
         html = self.sess.post(ACTION, {"ajax": "1", "building": library, "bday": date.isoformat(),
                                        "showBookingsForSelectedBuilding": "1"})
 
@@ -64,15 +80,43 @@ class LibraryBooking:
 
             yield (room_id, room_name, room_desc), available
 
+    # UNTESTED
     def make_booking(self, library_id, room_id, date_time, duration):
+        html = self.sess.get(ACTION, {
+            "submitBooking": 1, "building": "{} Library".format(library_id), "room_no": room_id,
+            "bday": date_time.date().isoformat(), "bhour": date_time.hour, "bminute": date_time.minute,
+            "bookingPeriod": duration
+        })
+
+        tree = lxml.html.fromstring(html.text)
+        # TODO raise error or return ID of booking
         return False
 
+    def my_bookings(self):
+        logging.info("Requesting bookings page")
+        html = self.sess.post(ACTION, {"ajax": "1", "showMyBookings": "1"})
+        tree = lxml.html.fromstring(self.cleaner.clean_html(html.text))
+
+        table = tree.xpath("//table[@id='btable']")
+        if not table:
+            raise RuntimeError("Cannot find bookings table!")
+
+        for row in table[0].xpath("./tr[td]"):
+            room_no = row[0].text
+            library = row[1].text
+            dt, duration = parse_booking_dt(row[2].text)
+            booking_id = int(row[3].xpath("./div/form/input[@name='booking_no']")[0].attrib['value'])
+
+            yield booking_id, library, room_no, dt, duration
+
+
+    #def delete_booking(self, booking_id):
+    #TODO
 
 if __name__ == "__main__":
     import argparse
     import tabulate
     import keyring
-    import dateutil.parser
     import math
 
     def draw(itree, start=8, end=23):
@@ -95,6 +139,7 @@ if __name__ == "__main__":
                         help='Specify the duration of the booking, in increments of 15 mins, up to a maximum of '
                              '120 mins. Default is 60 mins.')
     parser.add_argument('--rooms', action='store_true', help='List rooms available for a library. Defaults to today.')
+    parser.add_argument('--bookings', action='store_true', help='List your bookings.')
     parser.add_argument('--free', action='store_true', help='Only list rooms that are free.') #TODO
 
     args = parser.parse_args()
@@ -103,8 +148,10 @@ if __name__ == "__main__":
 
     lb = LibraryBooking(args.username, keyring.get_password('anu', args.username))
 
+    # TODO being able to check for free rooms within X minutes
     # TODO if library specified, check it's valid
     # TODO if date specified, check can book on that date
+    # TODO output ics file - CalDAV Support (ties in with Google cal etc)
 
     if args.libraries:
         print(tabulate.tabulate([list(x) for x in lb.available_libraries()],
@@ -128,4 +175,6 @@ if __name__ == "__main__":
                 print(room)
                 print(draw(itree))
 
-    # TODO list own bookings
+    if args.bookings:
+        print(tabulate.tabulate([list(x) for x in lb.my_bookings()],
+                                ['id', 'Library', 'Room', 'Booking Time', 'Duration'], tablefmt="fancy_grid"))
