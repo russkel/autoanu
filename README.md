@@ -16,11 +16,13 @@ Set your Wattle password for your uXXXXXX username into the keyring:
 keyring set anu uXXXXXX
 ```
 
+You can add a system variable called `WATTLE_USERNAME` that is set to your username. You will not be required to enter it as an argument to these tools.
+
 ### Tutorial Signup
 
 An example command line call of the tutorial.py script follows: 
 ```
-python tutorial.py --username uXXXXXX --groupid 902521 --id "Tutorial 06"
+python tutorial.py -u uXXXXXX --groupid 902521 --id "Tutorial 06"
 ```
 
 The `username` argument specifies the Wattle account to log in to, which you should have already added the password to the keychain.
@@ -43,3 +45,4 @@ To list bookings at Chifley on a certain date:
 ```python librarybook.py -u uXXXXXX --rooms -L Chifley -D "10/08/16"```
 
 Booking rooms needs further testing and error reporting.
+

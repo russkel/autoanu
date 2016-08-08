@@ -3,6 +3,7 @@ import logging
 import argparse
 import wattle
 import keyring
+import os
 
 # TODO python-dateutil has fuzzy date parsing for tutorial times
 # TODO use fuzzywuzzy for fuzzy string matching of tutorial names
@@ -67,9 +68,15 @@ logging.basicConfig(level=logging.INFO)
 parser = argparse.ArgumentParser(description='Automatically signs up to groups on Wattle')
 parser.add_argument('--groupid', type=int, help='Specify the group ID to sign up for')
 parser.add_argument('--id', help='The tutorial slot to sign up for (the string identifier from the group select page')
-parser.add_argument('--username', help='Wattle username to log in with', required=True)
+parser.add_argument('-u', '--username', help='Wattle username to log in with')
 
 args = parser.parse_args()
+
+if not args.username:
+    if 'WATTLE_USERNAME' not in os.environ:
+        parser.error("No Wattle username was provided, can't log in!")
+    else:
+        args.username = os.environ['WATTLE_USERNAME']
 
 w = wattle.Wattle(args.username, keyring.get_password('anu', args.username))
 
