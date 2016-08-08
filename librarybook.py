@@ -6,10 +6,14 @@ import requests
 import lxml.html
 import lxml.html.clean
 import dateutil.parser
+from collections import namedtuple
 
 SITE = "https://library-admin.anu.edu.au/book-a-library-group-study-room/"
 ACTION = SITE + "index.html"
 RE_UNAVAIL = re.compile("Not available: (\\d+:\\d+) - (\\d+:\\d+)")
+Room = namedtuple('Room', ['library', 'room_no', 'room_name', 'description', 'available'])
+
+# NOTE: Can book 10 days in advance, i.e. on the 7th you can book the 17th.
 
 
 def time_string(s):
@@ -78,19 +82,26 @@ class LibraryBooking:
             for start, finish in [match.groups() for match in unavail if match]:
                 available.chop(*time_to_interval(time_string(start), time_string(finish)))
 
-            yield (room_id, room_name, room_desc), available
+            yield Room(library, room_id, room_name, room_desc, available)
 
-    # UNTESTED
     def make_booking(self, library_id, room_id, date_time, duration):
-        html = self.sess.get(ACTION, {
+        html = self.sess.get(ACTION, params={
             "submitBooking": 1, "building": "{} Library".format(library_id), "room_no": room_id,
             "bday": date_time.date().isoformat(), "bhour": date_time.hour, "bminute": date_time.minute,
             "bookingPeriod": duration
         })
 
         tree = lxml.html.fromstring(html.text)
-        # TODO raise error or return ID of booking
-        return False
+        table = tree.xpath("//div[@id='formholder']/table/tr/td")
+        # TODO THIS NEEDS FIXING - CANNOT FIND TABLE
+        if not table:
+            with open("error.txt", "wb") as f:
+                f.write(html.text.encode('utf-8'))
+
+            raise RuntimeError("Cannot find booking confirmation table!")
+
+        booking_id = int(table[4].text)
+        return booking_id
 
     def my_bookings(self):
         logging.info("Requesting bookings page")
@@ -113,44 +124,54 @@ class LibraryBooking:
     #def delete_booking(self, booking_id):
     #TODO
 
+
 if __name__ == "__main__":
     import argparse
     import tabulate
     import keyring
     import math
+    import functools
+    import os
 
-    def draw(itree, start=8, end=23):
-        output = ""
+    def draw(itree, start, end):
+        columns = []
         for hr in range(math.floor(start), math.floor(end)):
-            for minute in [0, .25, .5, .75]:
-                output += "O" if itree[hr+minute] else "X"
-            output += "|"
+            columns.append("".join("·" if itree[hr + minute] else "⁕" for minute in [0, .25, .5, .75]))
 
-        return output
+        return columns
 
     parser = argparse.ArgumentParser(description='Books library rooms at the ANU libraries')
+    parser.add_argument('-u', '--username', help='Wattle username to log in with')
     parser.add_argument('--libraries', action='store_true', help='List libraries available')
     parser.add_argument('--dates', action='store_true', help='List dates that can be booked on')
-    parser.add_argument('--username', help='Wattle username to log in with', required=True)
-    parser.add_argument('-L', '--library', action='append', help='Specify the id of the library that the room is in')
-    parser.add_argument('-D', '--datetime', action='append', type=dateutil.parser.parse,
+    parser.add_argument('--bookings', action='store_true', help='List your bookings.')
+    parser.add_argument('-D', '--datetime', action='append', type=functools.partial(dateutil.parser.parse, dayfirst=True),
                         help='Specify the date and time for the booking, such as -D "2016-07-26:14:00')
+    parser.add_argument('-L', '--library', action='append', help='Specify the id of the library that the room is in')
+    parser.add_argument('-R', '--room', action='append', help='Specify the id of the room')
     parser.add_argument('-T', '--duration', action='append', type=int, default=60,
                         help='Specify the duration of the booking, in increments of 15 mins, up to a maximum of '
                              '120 mins. Default is 60 mins.')
     parser.add_argument('--rooms', action='store_true', help='List rooms available for a library. Defaults to today.')
-    parser.add_argument('--bookings', action='store_true', help='List your bookings.')
-    parser.add_argument('--free', action='store_true', help='Only list rooms that are free.') #TODO
+    parser.add_argument('--start', type=int, default=7, help='Show rooms from this hour. Defaults to 7:00')
+    parser.add_argument('--end', type=int, default=20, help='Show rooms to this hour. Defaults to 20:00')
+    parser.add_argument('--free', action='store_true', help='Only list rooms that are free at the datetime provided.') #TODO
 
     args = parser.parse_args()
 
+    if not args.username:
+        if 'WATTLE_USERNAME' not in os.environ:
+            parser.error("No Wattle username was provided, can't log in!")
+        else:
+            args.username = os.environ['WATTLE_USERNAME']
+
+    # TODO verbose option
     logging.basicConfig(level=logging.INFO)
 
     lb = LibraryBooking(args.username, keyring.get_password('anu', args.username))
 
-    # TODO being able to check for free rooms within X minutes
-    # TODO if library specified, check it's valid
-    # TODO if date specified, check can book on that date
+    # TODO being able to check for free rooms within X minutes - take datetime.now, round to next booking time
+    #   and find the room that is available for args.duration
     # TODO output ics file - CalDAV Support (ties in with Google cal etc)
 
     if args.libraries:
@@ -162,19 +183,52 @@ if __name__ == "__main__":
         for d in lb.available_dates():
             print(' * ', d)
 
-    if args.rooms:
-        if not args.library:
-            raise argparse.ArgumentError("Need to specify a library to view the rooms of.")
-
-        dates = args.datetime if args.datetime else [datetime.date.today()]
-        for date in dates:
-            if type(date) == datetime.datetime:
-                date = date.date()
-
-            for room, itree in lb.room_times(args.library, date):
-                print(room)
-                print(draw(itree))
-
     if args.bookings:
         print(tabulate.tabulate([list(x) for x in lb.my_bookings()],
                                 ['id', 'Library', 'Room', 'Booking Time', 'Duration'], tablefmt="fancy_grid"))
+
+    if args.library:
+        lib_ids = [l[0] for l in lb.available_libraries()]
+        if not all(l in lib_ids for l in args.library):
+            raise parser.error("Incorrect Library ID provided. It must consist of {}".format(
+                ", ".join(lib_ids)
+            ))
+
+    if args.datetime:
+        valid_dates = list(lb.available_dates())
+        desired = [x if type(x) is datetime.date else x.date() for x in args.datetime]
+        for d in desired:
+            if d not in valid_dates:
+                raise parser.error("Cannot book on the date provided: {}".format(d))
+    else:
+        args.datetime = [datetime.date.today()]
+
+    if args.rooms:
+        if not args.library:
+            args.library = [l[0] for l in lb.available_libraries()]
+
+        for date in args.datetime:
+            rooms = []
+
+            if type(date) == datetime.datetime:
+                date = date.date()
+
+            for library in args.library:
+                for room in lb.room_times(library, date):
+                    rooms.append(room)
+
+            hours = ["{:02}00".format(i) for i in range(args.start, args.end)]
+            data = [[room.library, room.room_no] + draw(room.available, args.start, args.end) + []
+                    for room in rooms]
+            print(tabulate.tabulate(data, ['Library', 'Room Id'] + hours + ['Description'],
+                                    tablefmt="fancy_grid"))
+
+        exit(0)
+
+    if args.datetime and args.room and args.library:
+        for dt, library, room_id in zip(args.datetime, args.library, args.room):
+            if type(dt) is not datetime.datetime:
+                raise parser.error("Cannot make a booking with just a date.")
+
+            #booking_id = lb.make_booking(library, room_id, dt, args.duration)
+            #print(booking_id)
