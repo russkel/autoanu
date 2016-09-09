@@ -172,6 +172,7 @@ if __name__ == "__main__":
     parser.add_argument('--start', type=int, default=7, help='Show rooms from this hour. Defaults to 7:00')
     parser.add_argument('--end', type=int, default=20, help='Show rooms to this hour. Defaults to 20:00')
     parser.add_argument('--free', action='store_true', help='Only list rooms that are free at the datetime provided.')
+    parser.add_argument('--verbose', '-v', action='store_true', help='Verbose output')
 
     args = parser.parse_args()
 
@@ -181,8 +182,8 @@ if __name__ == "__main__":
         else:
             args.username = os.environ['WATTLE_USERNAME']
 
-    # TODO verbose option
-    logging.basicConfig(level=logging.INFO)
+    if args.verbose:
+        logging.basicConfig(level=logging.INFO)
 
     lb = LibraryBooking(args.username, keyring.get_password('anu', args.username))
 
