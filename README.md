@@ -44,5 +44,8 @@ pip install dateutil
 To list bookings at Chifley on a certain date:
 ```python librarybook.py -u uXXXXXX --rooms -L Chifley -D "10/08/16"```
 
-Booking rooms needs further testing and error reporting.
+To show free rooms at a certain time:
+```python librarybook.py -u uXXXXXX --rooms --free -D "10/08/16 9:00"```
 
+To make a booking:
+```python librarybook.py -u uXXXXXX -L Hancock -R 3.09 -D "10/09/16 14:00"```
