@@ -136,10 +136,22 @@ class LibraryBooking:
 
             yield booking_id, library, room_no, dt, duration
 
+    def delete_booking(self, booking_id):
+        logging.info("Deleting booking with id {}".format(booking_id))
+        html = self.sess.get(ACTION, params={
+            "mycancellation": "Delete", "booking_no": booking_id})
 
-    #def delete_booking(self, booking_id):
-    #TODO
+        tree = lxml.html.fromstring(html.text)
+        msg = tree.xpath("//div[@id='bookingresponse']/h2")
 
+        if msg:
+            if msg[0].text == "Booking cancelled":
+                return True
+
+        with open("error.txt", "wb") as f:
+            f.write(html.text.encode('utf-8'))
+        raise RuntimeError(
+            "Unexpected error occurred. Cannot find delete confirmation! Response saved to error.txt")
 
 if __name__ == "__main__":
     import argparse
@@ -161,6 +173,7 @@ if __name__ == "__main__":
     parser.add_argument('--libraries', action='store_true', help='List libraries available')
     parser.add_argument('--dates', action='store_true', help='List dates that can be booked on')
     parser.add_argument('--bookings', action='store_true', help='List your bookings.')
+    parser.add_argument('--delete', '-rm', action='store', help='Delete the specified booking id.')
     parser.add_argument('-D', '--datetime', type=functools.partial(dateutil.parser.parse, dayfirst=True),
                         help='Specify the date and time for the booking, such as -D "2016-07-26:14:00')
     parser.add_argument('-L', '--library', action='append', help='Specify the id of the library that the room is in')
@@ -215,14 +228,14 @@ if __name__ == "__main__":
         valid_dates = list(lb.available_dates())
         desired = args.datetime if type(args.datetime) is datetime.date else args.datetime.date()
         if desired not in valid_dates:
-            raise parser.error("Cannot book on the date provided: {}".format(d))
+            raise parser.error("Cannot book on the date provided: {}".format(desired))
     else:
         args.datetime = datetime.datetime.now()
         args.start = args.datetime.hour
         args.end = math.ceil(args.datetime.hour + 2*args.duration/60)
 
     if args.free and not type(args.datetime) == datetime.datetime:
-        raise parser.error("Cannot show only free rooms without a time.")
+        raise parser.error("Cannot show free rooms without specifying a time.")
 
     if args.rooms:
         if not args.library:
@@ -247,6 +260,11 @@ if __name__ == "__main__":
             print(tabulate.tabulate(data, ['Library', 'Room Id', 'Seats'] + hours + ['Description'],
                                     tablefmt="fancy_grid"))
 
+        exit(0)
+
+    if args.delete:
+        lb.delete_booking(args.delete)
+        print("Deleted booking {}.".format(args.delete))
         exit(0)
 
     if args.datetime and args.room and args.library:
