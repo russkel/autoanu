@@ -49,3 +49,22 @@ To show free rooms at a certain time:
 
 To make a booking:
 ```python librarybook.py -u uXXXXXX -L Hancock -R 3.09 -D "10/09/16 14:00"```
+
+## EchoDL
+Install python libraries
+```
+pip install tabulate
+pip install dateutil
+```
+
+First make the Echo DL directory:
+```
+mkdir ~/EchoDL
+```
+
+Do an initial run of EchoDL to set up the subscriptions:
+```
+python echodl.py
+```
+It will log in to Wattle and list possible courses to subscribe to. Enter the desired course numbers separated by spaces.
+EchoDL will commence downloading all the lectures.

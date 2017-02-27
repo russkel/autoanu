@@ -4,11 +4,8 @@ import logging
 import re
 from urllib.parse import urlparse
 
-logging.basicConfig(level=logging.INFO)
-
 SITE = "https://wattlecourses.anu.edu.au"
 COURSE = SITE + "/course/view.php?id={}"
-ECHO = SITE + "/blocks/echo360_echocenter/echocenter_frame.php?id={}"
 GROUP = SITE + "/mod/groupselect/view.php?id={}"
 GROUP_VIEW = SITE + "/mod/groupselect/view.php"
 
@@ -25,24 +22,30 @@ class Wattle:
         tree = lxml.html.fromstring(self.homepage.text)
 
         courses = tree.xpath("//div[@id='course_list']/div[@class='box coursebox']")
-        out = {}
+        out = []
         for c in courses:
             course_id = int(c.attrib['id'].replace('course-', ''))
             title = c.xpath("div[@class='course_title']/h3/a")[0].text.strip()
-            out[course_id] = title
+            out.append((course_id, title))
 
         return out
 
     def course_echo_session(self, courseid):
         logging.info("Getting ECHO360 landing page for course id {}".format(courseid))
-        p = self.sess.get(ECHO.format(courseid))
+        p = self.sess.get(COURSE.format(courseid))
         tree = lxml.html.fromstring(p.text)
+        echoblockurl = tree.xpath("//div[@class='block_echo360_echocenter']/a")[0].attrib['href']
 
+        p = self.sess.get(echoblockurl)
+        tree = lxml.html.fromstring(p.text)
         echourl = tree.xpath("//iframe")[0].attrib['src']
         url = urlparse(echourl)
         logging.info("Sending ECHO360 login")
         p = self.sess.get(echourl)
         tree = lxml.html.fromstring(p.text)
+
+        if "Missing course section" in p.text:
+            return None
 
         echourl2 = tree.xpath("//iframe")[0].attrib['src']  # partial URL
         logging.info("Sending 2nd round ECHO360 login")
