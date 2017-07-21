@@ -94,15 +94,19 @@ class Wattle:
 
         return slots
 
-    def group_send_signup(self, signupid, post_data):
-        logging.info("Sending group sign up for id {}".format(signupid))
+    def group_send_postdata(self, signupid, post_data):
+        logging.info("Sending post data id {}".format(signupid))
         p = self.sess.post(GROUP_VIEW.format(signupid), post_data)
         tree = lxml.html.fromstring(p.text)
 
-        signupvals = tree.xpath("//form[@class='mform']/div/input")
+        if tree.xpath("//form[@class='mform']"):
+            signupvals = tree.xpath("//form[@class='mform']/div/input")
+        else:
+            signupvals = tree.xpath("//div[@class='singlebutton']/form/div/input")
+
         if signupvals:
             post_data = dict((field.attrib['name'], field.value)
                              for field in signupvals if 'name' in field.attrib)
-            logging.info("Sending group sign up confirmation".format(signupid))
+            logging.info("Sending confirmation".format(signupid))
             p = self.sess.post(GROUP_VIEW.format(signupid), post_data)
             return p
