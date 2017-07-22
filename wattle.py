@@ -91,7 +91,7 @@ class Wattle:
 
             identifier = row[0].xpath(".//text()")[0]
             description = [d.strip() for d in row[1].xpath(".//div/p/span/text()")]
-            capacity = row[2].text
+            capacity = [int(x) for x in row[2].text.split("/")]
             post_data = None
             signed_up = False
 

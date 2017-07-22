@@ -17,7 +17,7 @@ def group_signup_by_ident(watt, signupid, identifier):
         ident, description, capacity, post_data, signed_up = group
 
         if ident == identifier:
-            logging.info("Found tutorial slot with ident {} and capacity {}".format(ident, capacity))
+            logging.info("Found tutorial slot with ident {} and capacity {}/{}".format(ident, capacity[0], capacity[1]))
             if signed_up:
                 # TODO detect signed-up if the leave group button isn't there
                 logging.info("Already signed up for group for group id {}".format(signupid))
@@ -88,7 +88,8 @@ def leave(watt, signupid, group_details):
         ident, description, capacity, post_data, signed_up = group
 
         if signed_up:
-            logging.info("Going to leave tutorial slot with ident {} and capacity {}".format(ident, capacity))
+            logging.info("Going to leave tutorial slot with ident {} and capacity {}/{}".format(
+                ident, capacity[0], capacity[1]))
             if signed_up:
                 logging.info("Leaving {}".format(ident))
 
@@ -106,7 +107,6 @@ def watch(watt, signupid, identifier):
     open_dt, group_details = watt.group_details(signupid=signupid)
     for group in group_details:
         ident, description, capacity, post_data, signed_up = group
-        capacity = [int(x) for x in capacity.split("/")]
 
         if ident == identifier:
             logging.info("Found tutorial slot with ident \"{}\" and capacity {}/{}".format(
@@ -136,6 +136,7 @@ parser.add_argument('--groupid', type=int, help='Specify the group ID to sign up
 parser.add_argument('--id', help='The tutorial slot to sign up for (the string identifier from the group select page')
 parser.add_argument('--watch', action='store_true', help='Watch a slot to free up.')
 parser.add_argument('--sched', action='store_true', help='Enable scheduling.')
+parser.add_argument('--UI', action='store_true', help='Use terminal UI.')
 parser.add_argument('-u', '--username', help='Wattle username to log in with')
 
 args = parser.parse_args()
@@ -148,6 +149,44 @@ if not args.username:
         args.username = os.environ['WATTLE_USERNAME']
 
 w = wattle.Wattle(args.username, keyring.get_password('anu', args.username))
+
+if args.UI:
+    import npyscreen
+
+    def slot2ident(groups):
+        for grp in groups:
+            identifier, description, capacity, post_data, signed_up = grp
+            yield (identifier, "{}: {} {}/{}".format(identifier, description, capacity[0], capacity[1]))
+
+    class PopulateSelector(npyscreen.ActionForm):
+        def create(self):
+            self.value = None
+            self.populate = None
+            self.ms = self.add(npyscreen.TitleSelectOne, value=[0, ], name="Select",
+                 values=[], scroll_exit=True)
+
+        def beforeEditing(self):
+            self.options = self.populate()
+            self.ms.values = [op for i, op in self.options]
+            self.parentApp.setNextForm(self.parentApp.form_order.pop(0))
+
+        def on_ok(self):
+            self.value = self.options[self.ms.value[0]][0]
+
+    class SelectorUI(npyscreen.NPSAppManaged):
+        def onStart(self):
+            self.addForm("MAIN", PopulateSelector)
+            self.addForm("GROUPSELECT", PopulateSelector)
+            self.addForm("TIMESELECT", PopulateSelector)
+            self.getForm("MAIN").populate = lambda: w.courses()
+            self.getForm("GROUPSELECT").populate = lambda: list(w.course_signups(self.getForm("MAIN").value))
+            self.getForm("TIMESELECT").populate = lambda: list(slot2ident(w.group_details(self.getForm("GROUPSELECT").value)[1]))
+            self.form_order = ['GROUPSELECT', 'TIMESELECT', None]
+
+    myApp = SelectorUI()
+    myApp.run()
+    args.id = myApp.getForm("TIMESELECT").value
+    args.groupid = myApp.getForm("GROUPSELECT").value
 
 if args.id and args.groupid:
     if args.watch:
