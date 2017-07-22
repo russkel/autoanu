@@ -7,6 +7,7 @@ These tools require Python 3.5 or newer.
 pip install requests
 pip install lxml
 pip install keyring
+pip install dateutil
 pip install prompt-toolkit
 ```
 
@@ -22,14 +23,15 @@ You can add a system variable called `WATTLE_USERNAME` that is set to your usern
 
 An example command line call of the tutorial.py script follows: 
 ```
-python tutorial.py -u uXXXXXX --groupid 902521 --id "Tutorial 06"
+python tutorial.py -u uXXXXXX [--sched] [--watch] --groupid 902521 --id "Tutorial 06"
 ```
 
 The `username` argument specifies the Wattle account to log in to, which you should have already added the password to the keychain.
 The `groupid` argument is the numerical id of the group/tutorial sign-up page. This can be found by browsing to the tutorial sign up page and looking at the the numbers at the end of the URL.
 The `id` argument is the tutorial slot that the script will attempt to join. This is the string found in the tutorial sign up table, in the left most column of the row of the slot you wish to join.
+The `sched` switch will use the opening time of sign up, log in 20 seconds before and start trying to sign up 3 seconds before opening.
 
-At this point the script has no scheduling, so it will start to hammer wattle as soon as the command is run. Ideally you would start the script 5 seconds before the tutorial sign up opens to avoid any throttling or banning.
+Without the `--sched` option it will start to hammer wattle as soon as the command is run. If this is desired, you would ideally start the script 5 seconds before the tutorial sign up opens to avoid any throttling or banning.
 
 ### Booking Library Rooms
 
@@ -68,3 +70,9 @@ python echodl.py
 ```
 It will log in to Wattle and list possible courses to subscribe to. Enter the desired course numbers separated by spaces.
 EchoDL will commence downloading all the lectures.
+
+
+```
+cp echodl.plist ~/Library/LaunchAgents
+launchctl load ~/Library/LaunchAgents/echodl.plist
+```

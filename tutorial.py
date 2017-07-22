@@ -5,14 +5,15 @@ import wattle
 import keyring
 import os
 import time
+import sched
 
-# TODO python-dateutil has fuzzy date parsing for tutorial times
+# TODO dateutil.parser has fuzzy date parsing for tutorial times
 # TODO use fuzzywuzzy for fuzzy string matching of tutorial names
-# TODO scheduling using sched
 
 
 def group_signup_by_ident(watt, signupid, identifier):
-    for group in watt.group_details(signupid=signupid):
+    open_dt, group_details = watt.group_details(signupid=signupid)
+    for group in group_details:
         ident, description, capacity, post_data, signed_up = group
 
         if ident == identifier:
@@ -32,7 +33,8 @@ def group_signup_by_ident(watt, signupid, identifier):
 
 
 def group_fuzzy_signup(watt, signupid, name):
-    for group in watt.group_details(signupid=signupid):
+    open_dt, group_details = watt.group_details(signupid=signupid)
+    for group in group_details:
         ident, description, capacity, post_data, signed_up = group
 
         desc_match = [re.search(name, ident) for ident in description]
@@ -47,10 +49,25 @@ def group_fuzzy_signup(watt, signupid, name):
     return False
 
 
-def auto_signup(watt, signupid, ident):
-    while True:
-        if group_signup_by_ident(watt, signupid, ident):
-            break
+def auto_signup(watt, signupid, ident, schedule=False):
+    if schedule:
+        open_dt, group_details = watt.group_details(signupid=signupid)
+
+        if not open_dt:
+            raise RuntimeError("Cannot schedule: no opening time found. Are you sure it isn't already open?")
+
+        start_time = open_dt.timestamp()
+        if (start_time - time.time()) > 60*4:
+            # chances are we will to relog into wattle
+            scheduler.enterabs(start_time - 20, 1, lambda w: w.login(), (watt,))
+
+        scheduler.enterabs(start_time - 3, 1, auto_signup, (watt, signupid, ident))
+        logging.info("Scheduled to start in {} seconds for signup at {}.".format(start_time - time.time(), open_dt))
+        scheduler.run()
+    else:
+        while True:
+            if group_signup_by_ident(watt, signupid, ident):
+                break
 
 
 def auto_fuzzy_signup(watt, courseid, ident):
@@ -86,7 +103,7 @@ def leave(watt, signupid, group_details):
 
 
 def watch(watt, signupid, identifier):
-    group_details = watt.group_details(signupid=signupid)
+    open_dt, group_details = watt.group_details(signupid=signupid)
     for group in group_details:
         ident, description, capacity, post_data, signed_up = group
         capacity = [int(x) for x in capacity.split("/")]
@@ -112,15 +129,17 @@ def watch(watt, signupid, identifier):
                     return group_signup_by_ident(watt, signupid, ident)
 
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
 parser = argparse.ArgumentParser(description='Automatically signs up to groups on Wattle')
 parser.add_argument('--groupid', type=int, help='Specify the group ID to sign up for')
 parser.add_argument('--id', help='The tutorial slot to sign up for (the string identifier from the group select page')
 parser.add_argument('--watch', action='store_true', help='Watch a slot to free up.')
+parser.add_argument('--sched', action='store_true', help='Enable scheduling.')
 parser.add_argument('-u', '--username', help='Wattle username to log in with')
 
 args = parser.parse_args()
+scheduler = sched.scheduler(time.time, time.sleep)
 
 if not args.username:
     if 'WATTLE_USERNAME' not in os.environ:
@@ -136,6 +155,6 @@ if args.id and args.groupid:
             if watch(w, args.groupid, args.id):
                 break
             else:
-                time.sleep(30)
+                time.sleep(60)
     else:
-        auto_signup(w, args.groupid, args.id)
+        auto_signup(w, args.groupid, args.id, args.sched)

@@ -1,6 +1,7 @@
 import requests
 import lxml.html
 import logging
+import dateutil.parser
 import re
 from urllib.parse import urlparse
 
@@ -12,11 +13,17 @@ GROUP_VIEW = SITE + "/mod/groupselect/view.php"
 
 class Wattle:
     def __init__(self, username, password):
+        self.username = username
+        self.password = password
+
+        self.login()
+
+    def login(self):
         self.sess = requests.session()
 
-        logging.info("Logging into WATTLE with {}".format(username))
+        logging.info("Logging into WATTLE with {}".format(self.username))
         self.homepage = self.sess.post(SITE + "/login/index.php",
-                                       {'username': username, 'password': password, 'rememberusername': 0})
+                                       {'username': self.username, 'password': self.password, 'rememberusername': 0})
 
     def courses(self):
         tree = lxml.html.fromstring(self.homepage.text)
@@ -70,7 +77,13 @@ class Wattle:
         p = self.sess.get(GROUP.format(signupid))
         tree = lxml.html.fromstring(p.text)
 
-        #<div class="alert alert-error">Group selection will be available on Monday, 15 February 2016, 4:00 PM.</div>
+        open_time = tree.xpath("//section[@id='region-main']/div/div[@role='alert']")
+
+        if open_time:
+            raw_time = open_time[0][0].tail.strip()
+            open_dt = dateutil.parser.parse(raw_time, fuzzy=True)
+        else:
+            open_dt = None
 
         slots = []
         for row in tree.xpath("//table[@class='generaltable']/tbody/tr"):
@@ -92,7 +105,7 @@ class Wattle:
 
             slots.append((identifier, description, capacity, post_data, signed_up))
 
-        return slots
+        return open_dt, slots
 
     def group_send_postdata(self, signupid, post_data):
         logging.info("Sending post data id {}".format(signupid))
