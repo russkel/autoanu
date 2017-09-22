@@ -60,7 +60,7 @@ class Echo:
             filename = "{} - Week {:02} {}.m4v".format(self.course_name, week, letter)
         else:
             date = dateutil.parser.parse(lec_data['presentation']['startTime'])
-            filename = "{} - Week {:02} {}.m4v".format(self.course_name, week, date.strftime('%Y-%M-%d %a %H%M'))
+            filename = "{} - Week {:02} {}.m4v".format(self.course_name, week, date.strftime('%Y-%m-%d %a %H%M'))
 
         print("\nDownloading {} --> {}...".format(lec_data['presentation']['title'], filename))
         error_code = self.download(uuid, lec_data['presentation']['vodcast'].replace('media', 'mediacontent'),
