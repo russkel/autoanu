@@ -7,7 +7,7 @@ These tools require Python 3.5 or newer.
 pip install requests
 pip install lxml
 pip install keyring
-pip install dateutil
+pip install python-dateutil
 pip install prompt-toolkit
 ```
 
@@ -30,6 +30,7 @@ The `username` argument specifies the Wattle account to log in to, which you sho
 The `groupid` argument is the numerical id of the group/tutorial sign-up page. This can be found by browsing to the tutorial sign up page and looking at the the numbers at the end of the URL.
 The `id` argument is the tutorial slot that the script will attempt to join. This is the string found in the tutorial sign up table, in the left most column of the row of the slot you wish to join.
 The `sched` switch will use the opening time of sign up, log in 20 seconds before and start trying to sign up 3 seconds before opening.
+The `watch` switch will monitor that slot every minute until it can join it (in case that the slot is full and you are waiting for someone to leave).
 
 Without the `--sched` option it will start to hammer wattle as soon as the command is run. If this is desired, you would ideally start the script 5 seconds before the tutorial sign up opens to avoid any throttling or banning.
 
@@ -40,7 +41,6 @@ This is an automated room booking script, the idea being that you use OS X's Aut
 ```
 pip install intervaltree
 pip install tabulate
-pip install dateutil
 ```
 
 To list bookings at Chifley on a certain date:
@@ -56,7 +56,6 @@ To make a booking:
 Install python libraries
 ```
 pip install tabulate
-pip install dateutil
 ```
 
 First make the Echo DL directory:
